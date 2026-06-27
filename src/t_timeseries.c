@@ -270,6 +270,32 @@ size_t tsMemUsage(redisTimeSeries *ts) {
     return sz;
 }
 
+size_t tsLen(redisTimeSeries *ts) {
+    return ts->len;
+}
+
+/* Release backing pages after the fork child has serialized the key (CoW
+ * avoidance). Mirrors dismissObject() policy: only bother when the serialized
+ * value is large enough that individual allocations may span a page. */
+void tsDismiss(redisTimeSeries *ts, size_t size_hint) {
+    if (size_hint < (size_t)server.page_size) return;
+
+    if (ts->samples)
+        dismissMemory(ts->samples, ts->alloc * sizeof(tsSample));
+    if (ts->ts.buf)
+        dismissMemory(ts->ts.buf, ts->ts.alloc);
+
+    /* Label strings are usually small; only dismiss ones that look page-sized. */
+    for (size_t i = 0; i < ts->len; i++) {
+        if (ts->samples[i].labels &&
+            sdsAllocSize(ts->samples[i].labels) >= (size_t)server.page_size)
+        {
+            dismissMemory(ts->samples[i].labels,
+                          sdsAllocSize(ts->samples[i].labels));
+        }
+    }
+}
+
 redisTimeSeries *tsDup(redisTimeSeries *src) {
     redisTimeSeries *dst = tsCreate();
     if (src->len == 0) return dst;
@@ -461,6 +487,10 @@ robj *timeseriesTypeDup(robj *o) {
 
 size_t timeseriesTypeAllocSize(robj *o) {
     return tsMemUsage(o->ptr);
+}
+
+size_t timeseriesObjectLength(robj *o) {
+    return tsLen(o->ptr);
 }
 
 /* --------------------------------------------------------------------------

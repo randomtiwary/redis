@@ -3918,6 +3918,8 @@ void listpackExAddNew(robj *o, char *field, size_t flen,
 robj *arrayTypeDup(robj *o);
 robj *timeseriesTypeDup(robj *o);
 size_t timeseriesTypeAllocSize(robj *o);
+size_t timeseriesObjectLength(robj *o);
+void dismissTimeSeriesObject(robj *o, size_t size_hint);
 int rewriteTimeSeriesObject(rio *r, robj *key, robj *o);
 
 /* Pub / Sub */

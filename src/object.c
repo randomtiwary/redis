@@ -835,6 +835,18 @@ void dismissArrayObject(robj *o, size_t size_hint) {
     arDismiss(o->ptr, size_hint);
 }
 
+/* See dismissObject().
+ *
+ * Timeseries is a multi-allocation type (Gorilla bit buffer + samples array +
+ * optional label SDS strings), so CoW dismiss IS required — unlike GCRA, which
+ * is a single sub-page integer and therefore a deliberate no-op. We hand the
+ * backing pages back to the OS after the RDB/AOF fork child has serialized the
+ * key. Empty/tiny series short-circuit inside tsDismiss() when size_hint is
+ * below a page (same threshold as other complex types). */
+void dismissTimeSeriesObject(robj *o, size_t size_hint) {
+    tsDismiss(o->ptr, size_hint);
+}
+
 #ifdef ENABLE_GCRA
 void dismissGCRAObject(robj *o, size_t size_hint) {
     /* GCRA is a single allocation of a long long thus way smaller than a
@@ -876,7 +888,7 @@ void dismissObject(robj *o, size_t size_hint) {
         case OBJ_GCRA: dismissGCRAObject(o, size_hint); break;
 #endif
         case OBJ_ARRAY: dismissArrayObject(o, size_hint); break;
-        case OBJ_TIMESERIES: /* no COW dismiss needed */ break;
+        case OBJ_TIMESERIES: dismissTimeSeriesObject(o, size_hint); break;
         default: break;
     }
 #else
@@ -1002,7 +1014,7 @@ size_t getObjectLength(robj *o) {
         case OBJ_GCRA: return gcraObjectLength(o);
 #endif
         case OBJ_ARRAY: return arCount(o->ptr);
-        case OBJ_TIMESERIES: return ((redisTimeSeries *)o->ptr)->len;
+        case OBJ_TIMESERIES: return timeseriesObjectLength(o);
         default: return 0;
     }
 }

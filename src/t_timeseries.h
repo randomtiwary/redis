@@ -52,6 +52,8 @@ redisTimeSeries *tsCreate(void);
 void tsFree(redisTimeSeries *ts);
 redisTimeSeries *tsDup(redisTimeSeries *ts);
 size_t tsMemUsage(redisTimeSeries *ts);
+size_t tsLen(redisTimeSeries *ts);
+void tsDismiss(redisTimeSeries *ts, size_t size_hint);
 
 /* Set or overwrite sample at timestamp. Returns 1 if new, 0 if updated. */
 int tsSet(redisTimeSeries *ts, int64_t timestamp, double value, const char *labels);
