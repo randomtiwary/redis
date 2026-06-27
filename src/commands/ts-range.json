@@ -1,0 +1,55 @@
+{
+    "TS.RANGE": {
+        "summary": "Aggregate samples in a timestamp range (max, min, sum, or avg).",
+        "complexity": "O(N) where N is the number of samples in the series",
+        "group": "timeseries",
+        "since": "8.8.0",
+        "arity": 5,
+        "function": "tsrangeCommand",
+        "command_flags": [
+            "READONLY"
+        ],
+        "acl_categories": [
+            "TIMESERIES"
+        ],
+        "key_specs": [
+            {
+                "flags": [
+                    "RO",
+                    "ACCESS"
+                ],
+                "begin_search": {
+                    "index": {
+                        "pos": 1
+                    }
+                },
+                "find_keys": {
+                    "range": {
+                        "lastkey": 0,
+                        "step": 1,
+                        "limit": 0
+                    }
+                }
+            }
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "start",
+                "type": "integer"
+            },
+            {
+                "name": "end",
+                "type": "integer"
+            },
+            {
+                "name": "aggregation",
+                "type": "string"
+            }
+        ]
+    }
+}
