@@ -35,6 +35,7 @@ GROUPS = {
     "stream": "COMMAND_GROUP_STREAM",
     "bitmap": "COMMAND_GROUP_BITMAP",
     "array": "COMMAND_GROUP_ARRAY",
+    "timeseries": "COMMAND_GROUP_TIMESERIES",
     "rate_limit": "COMMAND_GROUP_RATE_LIMIT",
 }
 
@@ -328,7 +329,8 @@ class Command(object):
             self.reply_schema = ReplySchema(self.reply_schema_name(), self.desc["reply_schema"])
 
     def fullname(self):
-        return self.name.replace("-", "_").replace(":", "")
+        # Normalize to a valid C identifier (dots appear in names like TS.SET).
+        return to_c_name(self.name)
 
     def return_types_table_name(self):
         return "%s_ReturnInfo" % self.fullname().replace(" ", "_")
@@ -605,6 +607,7 @@ const char *COMMAND_GROUP_STR[] = {
     "stream",
     "bitmap",
     "array",
+    "timeseries",
     "module",
 #ifdef ENABLE_GCRA
     "rate_limit"

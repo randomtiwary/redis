@@ -1,0 +1,48 @@
+{
+    "TS.GET": {
+        "summary": "Get the sample at an exact timestamp from a time series.",
+        "complexity": "O(N) to decode timestamps, O(log N) lookup",
+        "group": "timeseries",
+        "since": "8.8.0",
+        "arity": 3,
+        "function": "tsgetCommand",
+        "command_flags": [
+            "READONLY",
+            "FAST"
+        ],
+        "acl_categories": [
+            "TIMESERIES"
+        ],
+        "key_specs": [
+            {
+                "flags": [
+                    "RO",
+                    "ACCESS"
+                ],
+                "begin_search": {
+                    "index": {
+                        "pos": 1
+                    }
+                },
+                "find_keys": {
+                    "range": {
+                        "lastkey": 0,
+                        "step": 1,
+                        "limit": 0
+                    }
+                }
+            }
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "timestamp",
+                "type": "integer"
+            }
+        ]
+    }
+}

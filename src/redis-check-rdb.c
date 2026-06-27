@@ -88,10 +88,13 @@ char *rdb_type_string[] = {
     "hash-listpack-md",
     "stream-v4",
     "stream-v5",
-    "array",
+    "array", /* 28 */
 #ifdef ENABLE_GCRA
-    "gcra",
+    "gcra", /* 29 */
+#else
+    "", /* 29 unused without GCRA */
 #endif
+    "timeseries", /* 30 */
 };
 
 /* Show a few stats collected into 'rdbstate' */

@@ -1,4 +1,5 @@
 #include "server.h"
+#include "t_timeseries.h"
 #include "bio.h"
 #include "atomicvar.h"
 #include "functions.h"
@@ -210,6 +211,9 @@ size_t lazyfreeGetFreeEffort(robj *key, robj *obj, int dbid) {
     } else if (obj->type == OBJ_ARRAY) {
         redisArray *ar = obj->ptr;
         return arCount(ar);
+    } else if (obj->type == OBJ_TIMESERIES) {
+        redisTimeSeries *ts = obj->ptr;
+        return ts->len;
     } else {
         return 1; /* Everything else is a single allocation. */
     }

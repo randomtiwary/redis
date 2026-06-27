@@ -1,0 +1,61 @@
+{
+    "TS.SET": {
+        "summary": "Set a sample in a time series at the given timestamp.",
+        "complexity": "O(N) where N is the number of samples (Gorilla timestamp stream rebuild)",
+        "group": "timeseries",
+        "since": "8.8.0",
+        "arity": -4,
+        "function": "tssetCommand",
+        "command_flags": [
+            "WRITE",
+            "DENYOOM",
+            "FAST"
+        ],
+        "acl_categories": [
+            "TIMESERIES"
+        ],
+        "key_specs": [
+            {
+                "flags": [
+                    "RW",
+                    "UPDATE"
+                ],
+                "begin_search": {
+                    "index": {
+                        "pos": 1
+                    }
+                },
+                "find_keys": {
+                    "range": {
+                        "lastkey": 0,
+                        "step": 1,
+                        "limit": 0
+                    }
+                }
+            }
+        ],
+        "reply_schema": {
+            "const": "OK"
+        },
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "timestamp",
+                "type": "integer"
+            },
+            {
+                "name": "value",
+                "type": "double"
+            },
+            {
+                "name": "labels",
+                "type": "string",
+                "optional": true
+            }
+        ]
+    }
+}
