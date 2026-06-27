@@ -2659,6 +2659,8 @@ int rewriteObject(rio *r, robj *key, robj *o, int dbid, long long expiretime) {
 #endif
     } else if (o->type == OBJ_ARRAY) {
         if (rewriteArrayObject(r,key,o) == 0) return C_ERR;
+    } else if (o->type == OBJ_TIMESERIES) {
+        if (rewriteTimeSeriesObject(r,key,o) == 0) return C_ERR;
     } else if (o->type == OBJ_MODULE) {
         if (rewriteModuleObject(r,key,o,dbid) == 0) return C_ERR;
     } else {

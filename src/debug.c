@@ -13,6 +13,7 @@
  */
 
 #include "server.h"
+#include "t_timeseries.h"
 #include "util.h"
 #include "sha1.h"   /* SHA1 is used for DEBUG DIGEST */
 #include "crc64.h"
@@ -292,6 +293,19 @@ void xorObjectDigest(redisDb *db, robj *keyobj, unsigned char *digest, robj *o) 
                 const char *data = arDecode(v, vbuf, sizeof(vbuf), &vlen);
                 mixDigest(digest, data, vlen);
             }
+        }
+    } else if (o->type == OBJ_TIMESERIES) {
+        redisTimeSeries *ts = o->ptr;
+        if (ts->len > 0) {
+            int64_t *timestamps = zmalloc(sizeof(int64_t) * ts->len);
+            tsDecodeTimestamps(ts, timestamps);
+            for (size_t i = 0; i < ts->len; i++) {
+                mixDigest(digest, &timestamps[i], sizeof(int64_t));
+                mixDigest(digest, &ts->samples[i].value, sizeof(double));
+                if (ts->samples[i].labels)
+                    mixDigest(digest, ts->samples[i].labels, sdslen(ts->samples[i].labels));
+            }
+            zfree(timestamps);
         }
     } else {
         serverPanic("Unknown object type");

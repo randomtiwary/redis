@@ -290,8 +290,9 @@ extern int configOOMScoreAdjValuesDefaults[CONFIG_OOM_COUNT];
 #define ACL_CATEGORY_TRANSACTION (1ULL<<19)
 #define ACL_CATEGORY_SCRIPTING (1ULL<<20)
 #define ACL_CATEGORY_ARRAY (1ULL<<21)
+#define ACL_CATEGORY_TIMESERIES (1ULL<<22)
 #ifdef ENABLE_GCRA
-#define ACL_CATEGORY_RATE_LIMIT (1ULL<<22)
+#define ACL_CATEGORY_RATE_LIMIT (1ULL<<23)
 #endif
 
 /* Key-spec flags *
@@ -806,10 +807,11 @@ typedef enum {
 #define NOTIFY_SUBKEYSPACEITEM (1<<21)   /* I, subkey-level notification per item: channel=key\nsubkey */
 #define NOTIFY_SUBKEYSPACEEVENT (1<<22)  /* V, subkey-level notification: channel=event|key */
 #define NOTIFY_ARRAY (1<<23)             /* a, array notification */
+#define NOTIFY_TIMESERIES (1<<24)        /* y, timeseries notification */
 #ifdef ENABLE_GCRA
-#define NOTIFY_RATE_LIMIT (1<<24)        /* r, notify rate limit event (Note: excluded from NOTIFY_ALL)*/
+#define NOTIFY_RATE_LIMIT (1<<25)        /* r, notify rate limit event (Note: excluded from NOTIFY_ALL)*/
 #endif
-#define NOTIFY_ALL (NOTIFY_GENERIC | NOTIFY_STRING | NOTIFY_LIST | NOTIFY_SET | NOTIFY_HASH | NOTIFY_ZSET | NOTIFY_EXPIRED | NOTIFY_EVICTED | NOTIFY_STREAM | NOTIFY_MODULE | NOTIFY_ARRAY) /* A flag */
+#define NOTIFY_ALL (NOTIFY_GENERIC | NOTIFY_STRING | NOTIFY_LIST | NOTIFY_SET | NOTIFY_HASH | NOTIFY_ZSET | NOTIFY_EXPIRED | NOTIFY_EVICTED | NOTIFY_STREAM | NOTIFY_MODULE | NOTIFY_ARRAY | NOTIFY_TIMESERIES) /* A flag */
 
 /* Using the following macro you can run code inside serverCron() with the
  * specified period, specified in milliseconds.
@@ -877,11 +879,12 @@ typedef enum {
 #define OBJ_MODULE 5    /* Module object. */
 #define OBJ_STREAM 6    /* Stream object. */
 #define OBJ_ARRAY 7     /* Array object. */
+#define OBJ_TIMESERIES 8 /* Time series object. */
 #ifdef ENABLE_GCRA
-#define OBJ_GCRA 8      /* GCRA object. */
-#define OBJ_TYPE_MAX 9  /* Maximum number of object types */
+#define OBJ_GCRA 9      /* GCRA object. */
+#define OBJ_TYPE_MAX 10 /* Maximum number of object types */
 #else
-#define OBJ_TYPE_MAX 8  /* Maximum number of object types */
+#define OBJ_TYPE_MAX 9  /* Maximum number of object types */
 #endif
 
 /* NOTE: adding a new object requires changes in the following places:
@@ -2860,6 +2863,7 @@ typedef enum {
     COMMAND_GROUP_STREAM,
     COMMAND_GROUP_BITMAP,
     COMMAND_GROUP_ARRAY,
+    COMMAND_GROUP_TIMESERIES,
     COMMAND_GROUP_MODULE,
 #ifdef ENABLE_GCRA
     COMMAND_GROUP_RATE_LIMIT,
@@ -3912,6 +3916,11 @@ void listpackExAddNew(robj *o, char *field, size_t flen,
 
 /* Array data type. */
 robj *arrayTypeDup(robj *o);
+robj *timeseriesTypeDup(robj *o);
+size_t timeseriesTypeAllocSize(robj *o);
+size_t timeseriesObjectLength(robj *o);
+void dismissTimeSeriesObject(robj *o, size_t size_hint);
+int rewriteTimeSeriesObject(rio *r, robj *key, robj *o);
 
 /* Pub / Sub */
 int pubsubUnsubscribeAllChannels(client *c, int notify);
@@ -4586,6 +4595,9 @@ void gcraSetValueCommand(client *c);
 
 /* Array commands (t_array.c) */
 void arsetCommand(client *c);
+void tssetCommand(client *c);
+void tsgetCommand(client *c);
+void tsrangeCommand(client *c);
 void argetCommand(client *c);
 void ardelCommand(client *c);
 void ardelrangeCommand(client *c);

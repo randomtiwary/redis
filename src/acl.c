@@ -58,6 +58,7 @@ struct ACLCategoryItem {
     {"hash", ACL_CATEGORY_HASH},
     {"string", ACL_CATEGORY_STRING},
     {"array", ACL_CATEGORY_ARRAY},
+    {"timeseries", ACL_CATEGORY_TIMESERIES},
     {"bitmap", ACL_CATEGORY_BITMAP},
     {"hyperloglog", ACL_CATEGORY_HYPERLOGLOG},
     {"geo", ACL_CATEGORY_GEO},

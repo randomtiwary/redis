@@ -13,6 +13,7 @@
  */
 
 #include "server.h"
+#include "t_timeseries.h"
 #include "lzf.h"    /* LZF compression library */
 #include "zipmap.h"
 #include "endianconv.h"
@@ -730,6 +731,8 @@ int rdbSaveObjectType(rio *rdb, robj *o) {
         return rdbSaveType(rdb,RDB_TYPE_MODULE_2);
     case OBJ_ARRAY:
         return rdbSaveType(rdb,RDB_TYPE_ARRAY);
+    case OBJ_TIMESERIES:
+        return rdbSaveType(rdb,RDB_TYPE_TIMESERIES);
     default:
         serverPanic("Unknown object type");
     }
@@ -1557,6 +1560,37 @@ ssize_t rdbSaveObject(rio *rdb, robj *o, robj *key, int dbid) {
                 arSlice *s = ar->dir[slice_id];
                 if (!s) continue;
                 if ((n = rdbSaveArraySlice(rdb, s, slice_id, ar->slice_size)) == -1) return -1;
+                nwritten += n;
+            }
+        }
+    } else if (o->type == OBJ_TIMESERIES) {
+        /* Persist count, Gorilla-compressed timestamps, then values and labels. */
+        redisTimeSeries *ts = o->ptr;
+        if ((n = rdbSaveLen(rdb, ts->len)) == -1) return -1;
+        nwritten += n;
+
+        size_t tbytes = gorillaBytes(&ts->ts);
+        if ((n = rdbSaveLen(rdb, tbytes)) == -1) return -1;
+        nwritten += n;
+        if ((n = rdbSaveLen(rdb, (uint64_t)ts->ts.bit_pos)) == -1) return -1;
+        nwritten += n;
+        if (tbytes) {
+            if (rdbWriteRaw(rdb, ts->ts.buf, tbytes) == -1) return -1;
+            nwritten += tbytes;
+        }
+
+        for (size_t i = 0; i < ts->len; i++) {
+            if ((n = rdbSaveBinaryDoubleValue(rdb, ts->samples[i].value)) == -1) return -1;
+            nwritten += n;
+            if (ts->samples[i].labels) {
+                if ((n = rdbSaveLen(rdb, 1)) == -1) return -1;
+                nwritten += n;
+                if ((n = rdbSaveRawString(rdb, (unsigned char *)ts->samples[i].labels,
+                                          sdslen(ts->samples[i].labels))) == -1)
+                    return -1;
+                nwritten += n;
+            } else {
+                if ((n = rdbSaveLen(rdb, 0)) == -1) return -1;
                 nwritten += n;
             }
         }
@@ -3896,6 +3930,79 @@ robj *rdbLoadObject(int rdbtype, rio *rdb, sds key, int dbid, int *error)
             }
 
             arSet(ar, idx, v);
+        }
+    } else if (rdbtype == RDB_TYPE_TIMESERIES) {
+        uint64_t count;
+        if ((count = rdbLoadLen(rdb, NULL)) == RDB_LENERR) return NULL;
+
+        uint64_t tbytes;
+        if ((tbytes = rdbLoadLen(rdb, NULL)) == RDB_LENERR) return NULL;
+        uint64_t bit_pos;
+        if ((bit_pos = rdbLoadLen(rdb, NULL)) == RDB_LENERR) return NULL;
+        if (bit_pos > 7) {
+            rdbReportCorruptRDB("Invalid timeseries gorilla bit_pos");
+            return NULL;
+        }
+
+        o = createTimeSeriesObject();
+        redisTimeSeries *ts = o->ptr;
+
+        if (count > 0) {
+            if (tbytes == 0) {
+                decrRefCount(o);
+                rdbReportCorruptRDB("Timeseries has samples but empty timestamp blob");
+                return NULL;
+            }
+            unsigned char *buf = zmalloc(tbytes);
+            if (rioRead(rdb, buf, tbytes) == 0) {
+                zfree(buf);
+                decrRefCount(o);
+                return NULL;
+            }
+            ts->ts.buf = buf;
+            ts->ts.alloc = tbytes;
+            /* Restore byte_len / bit_pos so decoder sees the same stream. */
+            if (bit_pos == 0) {
+                ts->ts.byte_len = tbytes;
+                ts->ts.bit_pos = 0;
+            } else {
+                ts->ts.byte_len = tbytes - 1;
+                ts->ts.bit_pos = (int)bit_pos;
+            }
+            ts->ts.count = count;
+
+            ts->samples = zcalloc(sizeof(tsSample) * count);
+            ts->alloc = count;
+            ts->len = count;
+            for (uint64_t i = 0; i < count; i++) {
+                if (rdbLoadBinaryDoubleValue(rdb, &ts->samples[i].value) == -1) {
+                    decrRefCount(o);
+                    return NULL;
+                }
+                uint64_t has_labels;
+                if ((has_labels = rdbLoadLen(rdb, NULL)) == RDB_LENERR) {
+                    decrRefCount(o);
+                    return NULL;
+                }
+                if (has_labels) {
+                    sds lab = rdbGenericLoadStringObject(rdb, RDB_LOAD_SDS, NULL);
+                    if (lab == NULL) {
+                        decrRefCount(o);
+                        return NULL;
+                    }
+                    ts->samples[i].labels = lab;
+                }
+            }
+            /* Validate gorilla stream by decoding. */
+            int64_t *tmp = zmalloc(sizeof(int64_t) * count);
+            if (gorillaDecodeAll(&ts->ts, tmp, count) != (int)count) {
+                zfree(tmp);
+                decrRefCount(o);
+                rdbReportCorruptRDB("Failed to decode timeseries timestamps");
+                return NULL;
+            }
+            zfree(tmp);
+            tsMemUsage(ts);
         }
     } else {
         rdbReportReadError("Unknown RDB encoding type %d",rdbtype);
